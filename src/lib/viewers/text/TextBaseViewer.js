@@ -175,19 +175,52 @@ class TextBaseViewer extends BaseViewer {
 
         event.preventDefault();
 
-        const delta = -event.deltaY * MIN_PINCH_SCALE_DELTA;
-        let newScale = this.scale * (1 + delta);
-        newScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, newScale));
+        const textEl = this.containerEl.querySelector('.bp-text');
+        if (!textEl) {
+            return;
+        }
 
-        this.containerEl.querySelector('.bp-text').style.fontSize = `${Math.round(newScale * 100)}%`;
+        const prevScale = this.scale;
+        const delta = -event.deltaY * MIN_PINCH_SCALE_DELTA;
+        const newScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, prevScale * (1 + delta)));
+
+        if (newScale === prevScale) {
+            return;
+        }
+
+        // Anchor the zoom at the cursor. With unitless line-height, text scales by exactly
+        // the font-size ratio - but padding does NOT scale, so we work in text-local coords
+        // (cursor position relative to the text origin, past any padding).
+        const rect = textEl.getBoundingClientRect();
+        const style = window.getComputedStyle(textEl);
+        const paddingTop = parseFloat(style.paddingTop) || 0;
+        const paddingLeft = parseFloat(style.paddingLeft) || 0;
+
+        const cursorX = event.clientX - rect.left;
+        const cursorY = event.clientY - rect.top;
+        const textCursorX = textEl.scrollLeft + cursorX - paddingLeft;
+        const textCursorY = textEl.scrollTop + cursorY - paddingTop;
+
+        // Apply scale. Use fractional percent so tiny pinch deltas produce continuous size
+        // changes instead of 1% steps (the zoom() button path still rounds). Round-trip
+        // through toFixed so our ratio math matches what the browser actually applies.
+        const appliedScale = Number.parseFloat((newScale * 100).toFixed(2)) / 100;
+        if (appliedScale === prevScale) {
+            return;
+        }
+        textEl.style.fontSize = `${appliedScale * 100}%`;
+
+        const ratio = appliedScale / prevScale;
+        textEl.scrollLeft = textCursorX * ratio + paddingLeft - cursorX;
+        textEl.scrollTop = textCursorY * ratio + paddingTop - cursorY;
 
         this.emit('zoom', {
-            canZoomIn: true,
-            canZoomOut: true,
-            zoom: newScale,
+            canZoomIn: appliedScale < ZOOM_MAX,
+            canZoomOut: appliedScale > ZOOM_MIN,
+            zoom: appliedScale,
         });
 
-        this.scale = newScale;
+        this.scale = appliedScale;
         this.renderUI();
     }
 

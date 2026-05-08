@@ -205,7 +205,7 @@ describe('lib/viewers/text/TextBaseViewer', () => {
 
         test('should do nothing if ctrlKey is not pressed', () => {
             jest.spyOn(textBase, 'emit');
-            const event = { ctrlKey: false, deltaY: -1, preventDefault: jest.fn() };
+            const event = { clientX: 0, clientY: 0, ctrlKey: false, deltaY: -1, preventDefault: jest.fn() };
 
             textBase.wheelZoomHandler(event);
             expect(event.preventDefault).not.toBeCalled();
@@ -215,7 +215,7 @@ describe('lib/viewers/text/TextBaseViewer', () => {
         test('should zoom in smoothly when deltaY is negative', () => {
             textBase.scale = 1.0;
             jest.spyOn(textBase, 'emit');
-            const event = { ctrlKey: true, deltaY: -10, preventDefault: jest.fn() };
+            const event = { clientX: 0, clientY: 0, ctrlKey: true, deltaY: -10, preventDefault: jest.fn() };
 
             textBase.wheelZoomHandler(event);
             expect(event.preventDefault).toBeCalled();
@@ -226,12 +226,53 @@ describe('lib/viewers/text/TextBaseViewer', () => {
         test('should zoom out smoothly when deltaY is positive', () => {
             textBase.scale = 1.0;
             jest.spyOn(textBase, 'emit');
-            const event = { ctrlKey: true, deltaY: 10, preventDefault: jest.fn() };
+            const event = { clientX: 0, clientY: 0, ctrlKey: true, deltaY: 10, preventDefault: jest.fn() };
 
             textBase.wheelZoomHandler(event);
             expect(event.preventDefault).toBeCalled();
             expect(textBase.scale).toBeLessThan(1.0);
             expect(textBase.renderUI).toBeCalled();
+        });
+
+        test('should anchor zoom at cursor by adjusting scroll position', () => {
+            textBase.scale = 1.0;
+            textEl.getBoundingClientRect = jest.fn().mockReturnValue({ left: 0, top: 0 });
+            textEl.scrollLeft = 100;
+            textEl.scrollTop = 200;
+
+            // Cursor 50px into the viewport; deltaY=-100 yields newScale=2.0 (applied=2.0).
+            const event = { clientX: 50, clientY: 50, ctrlKey: true, deltaY: -100, preventDefault: jest.fn() };
+            textBase.wheelZoomHandler(event);
+
+            // No padding in jsdom default, so textCursor == scroll+cursor. Ratio = 2/1 = 2.
+            // scrollLeft = (100+50)*2 - 50 = 250, scrollTop = (200+50)*2 - 50 = 450.
+            expect(textEl.scrollLeft).toBeCloseTo(250);
+            expect(textEl.scrollTop).toBeCloseTo(450);
+        });
+
+        test('should emit accurate canZoomIn/canZoomOut when clamped at max scale', () => {
+            textBase.scale = 9.99;
+            jest.spyOn(textBase, 'emit');
+            const event = { clientX: 0, clientY: 0, ctrlKey: true, deltaY: -1000, preventDefault: jest.fn() };
+
+            textBase.wheelZoomHandler(event);
+
+            expect(textBase.scale).toBe(10);
+            expect(textBase.emit).toBeCalledWith('zoom', { canZoomIn: false, canZoomOut: true, zoom: 10 });
+        });
+
+        test('should not update scroll or emit when scale is unchanged', () => {
+            textBase.scale = 10;
+            jest.spyOn(textBase, 'emit');
+            textEl.getBoundingClientRect = jest.fn().mockReturnValue({ left: 0, top: 0 });
+            textEl.scrollLeft = 42;
+            const event = { clientX: 10, clientY: 10, ctrlKey: true, deltaY: -100, preventDefault: jest.fn() };
+
+            textBase.wheelZoomHandler(event);
+
+            expect(textEl.scrollLeft).toBe(42);
+            expect(textBase.emit).not.toBeCalled();
+            expect(textBase.renderUI).not.toBeCalled();
         });
     });
 
