@@ -186,7 +186,7 @@ class Thumbnail {
      * Make a thumbnail image element
      *
      * @param {number} itemIndex - the item index for the overall list (0 indexed)
-     * @return {Promise} - promise reolves with the image HTMLElement or null if generation is in progress
+     * @return {{ image?: HTMLElement, inProgress?: boolean } | null} - the cache entry, or null if none exists
      */
     getImageFromCache(itemIndex) {
         return this.thumbnailImageCache?.get(itemIndex) || null;
