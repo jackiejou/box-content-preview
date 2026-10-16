@@ -1,6 +1,7 @@
 import BaseViewer from '../BaseViewer';
 import ErrorIcon from './ErrorIcon';
 import PreviewError from '../../PreviewError';
+import { BLUEPRINT_MIGRATION_SUPPORTING_UI } from '../../constants';
 import { canDownload } from '../../file';
 import { ERROR_CODE, VIEWER_EVENT } from '../../events';
 import { stripAuthFromString } from '../../util';
@@ -83,7 +84,10 @@ class PreviewErrorViewer extends BaseViewer {
         const { extension: iconExtension } = file || {};
 
         // Display the default or file-specific error icon
-        this.errorIcon = new ErrorIcon({ containerEl: this.iconEl });
+        this.errorIcon = new ErrorIcon({
+            containerEl: this.iconEl,
+            isBlueprintEnabled: this.featureEnabled(BLUEPRINT_MIGRATION_SUPPORTING_UI),
+        });
         this.errorIcon.render(iconExtension);
 
         // Display user-friendly error message

@@ -66,6 +66,28 @@ describe('lib/viewers/error/PreviewErrorViewer', () => {
             expect(error.errorIcon.render).toBeCalledWith(iconExtension);
         });
 
+        test('should pass isBlueprintEnabled false to ErrorIcon when the supporting UI flag is off', () => {
+            error.load(new PreviewError('some_code'));
+
+            expect(ErrorIcon).toBeCalledWith({ containerEl: error.iconEl, isBlueprintEnabled: false });
+        });
+
+        test('should pass isBlueprintEnabled true to ErrorIcon when the supporting UI flag is on', () => {
+            error.options.features = { blueprintMigrationSupportingUi: { enabled: true } };
+
+            error.load(new PreviewError('some_code'));
+
+            expect(ErrorIcon).toBeCalledWith({ containerEl: error.iconEl, isBlueprintEnabled: true });
+        });
+
+        test('should pass isBlueprintEnabled false to ErrorIcon when only another Blueprint wave is on', () => {
+            error.options.features = { blueprintMigrationArchive: { enabled: true } };
+
+            error.load(new PreviewError('some_code'));
+
+            expect(ErrorIcon).toBeCalledWith({ containerEl: error.iconEl, isBlueprintEnabled: false });
+        });
+
         test('should add link button if error has linkText and linkUrl defined', () => {
             jest.spyOn(error, 'addLinkButton');
             jest.spyOn(error, 'addDownloadButton');
