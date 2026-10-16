@@ -4,7 +4,9 @@
 
 import React from 'react';
 import { createRoot, Root } from 'react-dom/client';
+import BlueprintProviders from '../../BlueprintProviders';
 import Thumbnail from '../../Thumbnail';
+import { BLUEPRINT_MIGRATION_SUPPORTING_UI } from '../../constants';
 import { FeatureConfig, isFeatureEnabled } from '../../featureChecking';
 import {
     GALLERY_MAX_PAGES,
@@ -13,15 +15,17 @@ import {
     GALLERY_SCALE_STEP,
     THUMBNAILS_SIDEBAR_TRANSITION_TIME,
 } from './constants';
-import GalleryGrid, { GalleryThumbnail } from './GalleryGrid';
+import GalleryGrid from './GalleryGrid';
+import GalleryGridV2 from './GalleryGridV2';
+import { GalleryThumbnail } from './types';
 import { PinchDirection } from './useGalleryPinch';
 
-// Controller-owned shape: GalleryGrid only sees the read surface (GalleryThumbnail),
+// Controller-owned shape: the gallery grids only see the read surface (GalleryThumbnail),
 // but the controller also needs destroy() to invalidate the cache on rotate/teardown.
 type ManagedGalleryThumbnail = GalleryThumbnail & { destroy: () => void };
 
 // Minimal local shapes for untyped peer modules (pdfjs is JS-only, sidebar is JS-only).
-// Only the members the controller actually uses are declared — extend as needed.
+// Only the members the controller actually uses are declared; extend as needed.
 interface PdfViewerLike {
     currentPageNumber: number;
     pagesCount: number;
@@ -239,7 +243,7 @@ export default class GalleryController {
      * Redirects a grid-nav key pressed outside the grid (e.g. focus parked on a toggle after
      * toggling fullscreen) back into it: refocuses the selected tile and replays the key so
      * the first press navigates, like the thumbnail sidebar. Keys pressed inside the grid
-     * never arrive here — GalleryGrid stops propagation on every arrow/Home/End it handles.
+     * never arrive here, because both grids stop propagation on the navigation keys they handle.
      */
     handleArrowKey(key: string): void {
         if (!this.isGalleryOpen) return;
@@ -248,7 +252,9 @@ export default class GalleryController {
         const grid = this.galleryEl;
         if (!grid) return;
 
-        const tile = grid.querySelector<HTMLElement>('[role="option"][tabindex="0"], [role="gridcell"][tabindex="0"]');
+        const tile = grid.querySelector<HTMLElement>(
+            '[role="option"][tabindex="0"], [role="gridcell"][tabindex="0"], [role="row"][data-page][tabindex="0"]',
+        );
         if (tile) {
             tile.focus();
             tile.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
@@ -379,6 +385,31 @@ export default class GalleryController {
         }
 
         const pdfViewer = this.getPdfViewer();
+
+        if (isFeatureEnabled(this.features, BLUEPRINT_MIGRATION_SUPPORTING_UI)) {
+            this.galleryRoot.render(
+                <BlueprintProviders container={this.containerEl}>
+                    <GalleryGridV2
+                        currentPage={pdfViewer.currentPageNumber}
+                        getPageRatio={this.getPageRatio}
+                        isPinchZoomEnabled={
+                            this.isEnhancedGalleryEnabled && isFeatureEnabled(this.features, 'pinchToZoom.enabled')
+                        }
+                        isTouchZoomEnabled={this.isEnhancedGalleryEnabled && this.hasTouch}
+                        onClose={this.toggle}
+                        onFocusChange={this.handleFocusChange}
+                        onPageNavigate={this.handleGalleryNavigate}
+                        onPinchStart={this.onZoomGesture}
+                        onScaleChange={this.commitScale}
+                        pageCount={pdfViewer.pagesCount}
+                        scale={this.galleryScale}
+                        thumbnail={this.galleryThumbnail}
+                    />
+                </BlueprintProviders>,
+            );
+            return;
+        }
+
         this.galleryRoot.render(
             <GalleryGrid
                 currentPage={pdfViewer.currentPageNumber}

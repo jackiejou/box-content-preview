@@ -6,6 +6,11 @@ export const SCROLL_THROTTLE_MS = 200;
 export const GALLERY_TILE_GAP = 16;
 export const GALLERY_TILE_MIN_WIDTH = 220;
 
+// Keep in sync with GridListV2's small variant column track; its gap is read from the rendered grid.
+export const GALLERY_V2_TILE_MIN_WIDTH_REM = 15.625;
+// US Letter page shape (8.5 x 11 in), width:height, used while a page's real ratio is unknown.
+export const GALLERY_FALLBACK_PAGE_RATIO = 8.5 / 11;
+
 export const GALLERY_THUMB_WIDTH_TIERS = [
     GALLERY_THUMB_MAX_WIDTH,
     GALLERY_THUMB_MAX_WIDTH * 2,

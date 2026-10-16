@@ -13,7 +13,7 @@
     background-color: $white;
 }
 
-// Keep 220px/16px in sync with GalleryGrid's GALLERY_TILE_MIN_WIDTH/GALLERY_TILE_GAP.
+// Keep 220px/16px in sync with GALLERY_TILE_MIN_WIDTH/GALLERY_TILE_GAP in constants.ts.
 .bp-gallery-grid-inner {
     --bp-gallery-hover-scale: 1.02;
 
@@ -107,6 +107,8 @@
 .bp-gallery-tile-placeholder {
     display: block;
     width: 100%;
+
+    // The US Letter shape of GALLERY_FALLBACK_PAGE_RATIO in constants.ts.
     padding-top: 129%;
 }
 

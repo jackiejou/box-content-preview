@@ -4,7 +4,10 @@ import {
     GALLERY_MIN_SCALE,
     THUMBNAILS_SIDEBAR_TRANSITION_TIME,
 } from '../constants';
+import BlueprintProviders from '../../../BlueprintProviders';
 import GalleryController, { GalleryControllerOptions } from '../GalleryController';
+import GalleryGrid from '../GalleryGrid';
+import GalleryGridV2 from '../GalleryGridV2';
 
 jest.mock('../../../Thumbnail', () => {
     return jest.fn().mockImplementation(() => ({
@@ -51,6 +54,7 @@ function makeController(
         flagOn?: boolean;
         hasTouch?: boolean;
         enhancedGalleryEnabled?: boolean;
+        isBlueprintSupportingUiEnabled?: boolean;
     } = {},
 ): Harness {
     const {
@@ -61,6 +65,7 @@ function makeController(
         flagOn = true,
         hasTouch = false,
         enhancedGalleryEnabled = true,
+        isBlueprintSupportingUiEnabled = false,
     } = overrides;
 
     const containerEl = document.createElement('div');
@@ -87,6 +92,7 @@ function makeController(
             galleryView: { enabled: flagOn },
             galleryViewV2: { enabled: enhancedGalleryEnabled },
             pinchToZoom: { enabled: true },
+            blueprintMigrationSupportingUi: { enabled: isBlueprintSupportingUiEnabled },
         },
         hasTouch,
         getPdfViewer: () => pdfViewer,
@@ -314,6 +320,43 @@ describe('GalleryController', () => {
             expect(typeof grid.props.getPageRatio).toBe('function');
         });
 
+        test('should render the legacy GalleryGrid when the supporting UI flag is off', () => {
+            const { controller } = makeController();
+            controller.toggle();
+
+            expect(mockLastRoot.render.mock.calls[0][0].type).toBe(GalleryGrid);
+        });
+
+        test('should render the Blueprint grid inside Blueprint providers when the supporting UI flag is on', () => {
+            const { controller, containerEl } = makeController({
+                currentPage: 3,
+                hasTouch: true,
+                isBlueprintSupportingUiEnabled: true,
+                pageCount: 25,
+            });
+            controller.toggle();
+
+            expect(mockLastRoot.render).toHaveBeenCalledTimes(1);
+            const providers = mockLastRoot.render.mock.calls[0][0];
+            expect(providers.type).toBe(BlueprintProviders);
+            expect(providers.props.container).toBe(containerEl);
+
+            const grid = providers.props.children;
+            expect(grid.type).toBe(GalleryGridV2);
+            expect(grid.props.currentPage).toBe(3);
+            expect(grid.props.pageCount).toBe(25);
+            expect(grid.props.isPinchZoomEnabled).toBe(true);
+            expect(grid.props.isTouchZoomEnabled).toBe(true);
+            expect(grid.props.scale).toBe(1);
+            expect(grid.props.thumbnail).toBeDefined();
+            expect(grid.props.onClose).toBe(controller.toggle);
+            expect(typeof grid.props.onPageNavigate).toBe('function');
+            expect(typeof grid.props.onFocusChange).toBe('function');
+            expect(typeof grid.props.onPinchStart).toBe('function');
+            expect(typeof grid.props.onScaleChange).toBe('function');
+            expect(typeof grid.props.getPageRatio).toBe('function');
+        });
+
         describe('getPageRatio prop', () => {
             function getGridGetPageRatio(controller: GalleryController): (pageNum: number) => number | null {
                 controller.toggle();
@@ -424,7 +467,7 @@ describe('GalleryController', () => {
             const grid = mockLastRoot.render.mock.calls[0][0];
             grid.props.onPageNavigate(3);
 
-            // No page change, but the user still found their page — that is a pick, not a bail
+            // No page change, but the user still found their page; that is a pick, not a bail
             expect(setPage).not.toHaveBeenCalled();
             expect(onClose).toHaveBeenCalledWith(3);
         });
@@ -438,7 +481,7 @@ describe('GalleryController', () => {
         });
 
         // Closing commits whichever page was browsed to, so the user has landed on it even though
-        // they never picked it outright — reported as a landing to match what the document does.
+        // they never picked it outright. It is reported as a landing to match what the document does.
         test('should report the browsed page when closed after arrowing to it', () => {
             const { controller, onClose, setPage } = makeController({ currentPage: 1, sidebarOpen: false });
             controller.toggle();
@@ -651,6 +694,37 @@ describe('GalleryController', () => {
             controller.handleArrowKey('ArrowDown');
 
             expect(document.activeElement).toBe(tile);
+        });
+
+        test('should redirect into the selected row of the Blueprint grid', () => {
+            const { controller, containerEl } = makeController({
+                isBlueprintSupportingUiEnabled: true,
+                sidebarOpen: false,
+            });
+            const toggle = seedToggle(containerEl);
+            controller.toggle();
+            const tile = seedSelectedTile(containerEl, 'row');
+            tile.setAttribute('data-page', '1');
+            const tileKeydown = jest.fn();
+            tile.addEventListener('keydown', tileKeydown);
+
+            toggle.focus();
+            controller.handleArrowKey('ArrowRight');
+
+            expect(document.activeElement).toBe(tile);
+            expect(tileKeydown.mock.calls[0][0].key).toBe('ArrowRight');
+        });
+
+        test('should not redirect into a row without a page', () => {
+            const { controller, containerEl } = makeController({ sidebarOpen: false });
+            const toggle = seedToggle(containerEl);
+            controller.toggle();
+            seedSelectedTile(containerEl, 'row');
+
+            toggle.focus();
+            controller.handleArrowKey('ArrowDown');
+
+            expect(document.activeElement).toBe(toggle);
         });
 
         test('should not redirect focus for non-grid-nav keys', () => {

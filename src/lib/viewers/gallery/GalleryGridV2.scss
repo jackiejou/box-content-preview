@@ -1,0 +1,8 @@
+// Pins the close button in the grid's top padding, left of its scrollbar; keep z-index equal to
+// .bp-gallery-grid's so DOM order paints it on top.
+.bp-gallery-close {
+    position: absolute;
+    z-index: 4;
+    top: var(--bp-space-020);
+    right: var(--bp-space-060);
+}
